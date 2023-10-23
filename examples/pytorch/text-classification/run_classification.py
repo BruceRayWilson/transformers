@@ -28,6 +28,7 @@ import datasets
 import evaluate
 import numpy as np
 from datasets import Value, load_dataset
+from datasets import Dataset
 
 import transformers
 from transformers import (
@@ -377,12 +378,118 @@ def main():
 
         if data_args.train_file.endswith(".csv"):
             # Loading a dataset from local csv files
+            print(f"data_files: {data_files}")
+            print(f"model_args.cache_dir: {model_args.cache_dir}")
+            print(f"model_args.token: {model_args.token}")
+            
+
+
+
+            data_path = "dataset.csv" #@param {type:"string"}
+            text_column_name = "email" #@param {type:"string"}
+            label_column_name = "category" #@param {type:"string"}
+
+            model_name = "distilbert-base-uncased" #@param {type:"string"}
+            test_size = 0.2 #@param {type:"number"}
+            num_labels = 2 #@param {type:"number"}
+
+            df = pd.read_csv(data_path)
+            df.head()
+
+            from sklearn import preprocessing
+le = preprocessing.LabelEncoder()
+le.fit(df[label_column_name].tolist())
+df['label'] = le.transform(df[label_column_name].tolist())
+df.head()
+
+from sklearn.model_selection import train_test_split
+df_train,df_test = train_test_split(df,test_size=test_size)
+
+
+from datasets import Dataset
+train_dataset = Dataset.from_pandas(df_train)
+test_dataset = Dataset.from_pandas(df_test)
+
+# Tokenizer
+train_dataset = Dataset.from_pandas(df_train)
+test_dataset = Dataset.from_pandas(df_test)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+def preprocess_function(examples):
+    return tokenizer(examples["text_cleaned"], truncation=True)
+tokenized_train = train_dataset.map(preprocess_function, batched=True)tokenized_test = test_dataset.map(preprocess_function, batched=True)
+
+# Initialize model
+from transformers import AutoModelForSequenceClassification
+model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+
+# Train model
+from transformers import DataCollatorWithPadding
+from transformers import TrainingArguments, Trainer
+import evaluate
+import numpy as np
+
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+metric = evaluate.load("accuracy")
+
+def compute_metrics(eval_pred):
+    logits, labels = eval_pred
+    predictions = np.argmax(logits, axis=-1)
+    return metric.compute(predictions=predictions, references=labels)
+
+training_args = TrainingArguments(
+    output_dir="./results",
+    learning_rate=2e-4,
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    num_train_epochs=5,
+    weight_decay=0.01,
+    evaluation_strategy = "epoch",
+    logging_strategy="epoch"
+)
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_train,
+    eval_dataset=tokenized_test,
+    tokenizer=tokenizer,
+    data_collator=data_collator,
+    compute_metrics=compute_metrics
+    
+)
+
+
+trainer.train()
+
+
+
+
+            features = {
+                'Sentence': Value('string', id=0),
+                'Gain': Value('string', id=1)
+            }
+
             raw_datasets = load_dataset(
                 "csv",
                 data_files=data_files,
                 cache_dir=model_args.cache_dir,
                 token=model_args.token,
+                features=features  # Add the features argument here
             )
+            
+            # # Define the expected schema
+            # data_schema = {
+            #     "Sentence": "string",
+            #     "Gain": "string"
+            # }
+
+            # # Load the dataset and select only the desired columns
+            # raw_datasets = Dataset.from_csv(data_files, 
+            #                                features=data_schema, 
+            #                                select_columns=["Sentence", "Gain"])
+
         else:
             # Loading a dataset from local json files
             raw_datasets = load_dataset(

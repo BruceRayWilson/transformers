@@ -82,15 +82,18 @@ python run_glue.py \
 > If your model classification head dimensions do not fit the number of labels in the dataset, you can specify `--ignore_mismatched_sizes` to adapt it.
 
 ## Text classification
+
 As an alternative, we can use the script [`run_classification.py`](./run_classification.py) to fine-tune models on a single/multi-label classification task. 
 
 The following example fine-tunes BERT on the `en` subset of  [`amazon_reviews_multi`](https://huggingface.co/datasets/amazon_reviews_multi) dataset.
-We can specify the metric, the label column and aso choose which text columns to use jointly for classification. 
+We can specify the metric, the label column and aso choose which text columns to use jointly for classification.
+
 ```bash
 dataset="amazon_reviews_multi"
 subset="en"
+model=bert-base-uncased
 python run_classification.py \
-    --model_name_or_path  bert-base-uncased \
+    --model_name_or_path  ${model} \
     --dataset_name ${dataset} \
     --dataset_config_name ${subset} \
     --shuffle_train_dataset \
@@ -106,9 +109,11 @@ python run_classification.py \
     --num_train_epochs 1 \
     --output_dir /tmp/${dataset}_${subset}/
 ```
+
 Training for 1 epoch results in acc of around 0.5958 for review_body only and 0.659 for title+body+category.
 
 The following is a multi-label classification example. It fine-tunes BERT on the `reuters21578` dataset hosted on our [hub](https://huggingface.co/datasets/reuters21578):
+
 ```bash
 dataset="reuters21578"
 subset="ModApte"
@@ -129,6 +134,7 @@ python run_classification.py \
     --num_train_epochs 15 \
     --output_dir /tmp/${dataset}_${subset}/ 
 ```
+
  It results in a Micro F1 score of around 0.82 without any text and label filtering. Note that you have to explictly remove the "unused" split from the dataset, since it is not used for classification.
 
 ### Mixed precision training
